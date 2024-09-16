@@ -11,29 +11,10 @@ use std::env;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let rabbitmq_uri_env_var_name = "MARITIMO_RABBITMQ_URI";
-    let incoming_queue_env_var_name = "MARITIMO_RABBITMQ_ENCODED_MESSAGES_QUEUE_NAME";
-    let outgoing_exchange_env_var_name = "MARITIMO_RABBITMQ_DECODED_MESSAGES_EXCHANGE_NAME";
-    let loglevel_env_var_name = "MARITIMO_LOG_LEVEL_MINIMUM";
-
-    let rabbitmq_uri;
-    let incoming_queue;
-    let outgoing_exchange;
-    let loglevel;
-
-    match env::var(loglevel_env_var_name) {
-        Ok(value) => loglevel = value,
-        Err(_) => {
-            return Err(MissingEnvironmentVariableError {
-                message: format!(
-                    "No minimum log level configured. Set {} environment variable",
-                    loglevel_env_var_name
-                )
-                .to_string(),
-            }
-            .into());
-        }
-    }
+    let rabbitmq_uri = "amqp://guest:guest@localhost:5672";
+    let incoming_queue = "encoded_messages";
+    let outgoing_exchange = "decoded_messages";
+    let loglevel = "INFORMATION";
 
     let level_filter = match loglevel.to_uppercase().as_str() {
         "TRACE" => LevelFilter::Trace,
@@ -45,67 +26,24 @@ fn main() -> Result<(), Box<dyn Error>> {
         "NONE" => LevelFilter::Off,
         _ => {
             return Err(IncorrectEnvironmentVariableValueError {
-            message: format!(
-                "Minimum log level specified not a valid value (currently set to '{}'). Set {} environment variable to one of the following values: Trace, Debug, Information, Warning, Error, Critical, None.",
-                loglevel,
-                loglevel_env_var_name
-            )
-            .to_string(),
-        }
-        .into());
+                message: format!(
+                    "Minimum log level specified not a valid value (currently set to '{}'). Set log level to one of the following values: Trace, Debug, Information, Warning, Error, Critical, None.",
+                    loglevel
+                )
+                .to_string(),
+            }
+            .into());
         }
     };
 
     Builder::new().filter_level(level_filter).init();
 
-    match env::var(rabbitmq_uri_env_var_name) {
-        Ok(value) => rabbitmq_uri = value,
-        Err(_) => {
-            return Err(MissingEnvironmentVariableError {
-                message: format!(
-                    "No broker URI configured. Set {} environment variable",
-                    rabbitmq_uri_env_var_name
-                )
-                .to_string(),
-            }
-            .into());
-        }
-    }
-
-    match env::var(incoming_queue_env_var_name) {
-        Ok(value) => incoming_queue = value,
-        Err(_) => {
-            return Err(MissingEnvironmentVariableError {
-                message: format!(
-                    "No queue name for encoded messages configured. Set {} environment variable",
-                    incoming_queue_env_var_name
-                )
-                .to_string(),
-            }
-            .into());
-        }
-    }
-
-    match env::var(outgoing_exchange_env_var_name) {
-        Ok(value) => outgoing_exchange = value,
-        Err(_) => {
-            return Err(MissingEnvironmentVariableError {
-                message: format!(
-                    "No exchange name for decoded messages configured. Set {} environment variable",
-                    outgoing_exchange_env_var_name
-                )
-                .to_string(),
-            }
-            .into());
-        }
-    }
-
-    let mut incoming_connection = Connection::insecure_open(&rabbitmq_uri)?;
+    let mut incoming_connection = Connection::insecure_open(rabbitmq_uri)?;
 
     let incoming_channel = incoming_connection.open_channel(None)?;
 
     let queue = incoming_channel.queue_declare(
-        &incoming_queue,
+        incoming_queue,
         QueueDeclareOptions {
             durable: false,
             ..QueueDeclareOptions::default()
@@ -116,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let consumer = queue.consume(ConsumerOptions::default())?;
 
-    let mut outgoing_connection = Connection::insecure_open(&rabbitmq_uri)?;
+    let mut outgoing_connection = Connection::insecure_open(rabbitmq_uri)?;
 
     let outgoing_channel = outgoing_connection.open_channel(None)?;
 
