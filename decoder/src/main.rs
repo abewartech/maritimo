@@ -11,7 +11,7 @@ use std::env;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let rabbitmq_uri = "amqp://guest:guest@localhost:5672";
+    let rabbitmq_uri = "amqp://openais:super_secret_password@localhost:15672";
     let incoming_queue = "encoded_messages";
     let outgoing_exchange = "decoded_messages";
     let loglevel = "INFORMATION";
